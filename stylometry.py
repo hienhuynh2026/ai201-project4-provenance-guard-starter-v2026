@@ -30,8 +30,11 @@ anything together:
     python stylometry.py "some text to look at"
 """
 
+import math
 import re
 import statistics
+
+TTR_WINDOW = 50
 
 
 def sentences(text: str) -> list[str]:
@@ -64,8 +67,13 @@ def sentence_length_spread(text: str) -> float:
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
     """
-    # TODO: replace this
-    return 0.0
+    lengths = [len(words(s)) for s in sentences(text)]
+    lengths = [n for n in lengths if n > 0]
+    # One sentence has no spread to measure. 0.0 is the honest raw value;
+    # style_signal treats it as "no evidence" rather than as "very AI".
+    if len(lengths) < 2:
+        return 0.0
+    return statistics.stdev(lengths) / statistics.mean(lengths)
 
 
 def type_token_ratio(text: str) -> float:
@@ -80,8 +88,19 @@ def type_token_ratio(text: str) -> float:
     directly comparable on it, and if your test inputs vary a lot in length,
     that alone can look like a signal.
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens:
+        return 0.0
+    # Moving-average TTR: the mean ratio over every 50-word window. Raw TTR
+    # falls as text gets longer, so a fixed window keeps a 60-word piece and a
+    # 600-word piece comparable. Shorter than one window -> plain TTR.
+    if len(tokens) <= TTR_WINDOW:
+        return len(set(tokens)) / len(tokens)
+    ratios = [
+        len(set(tokens[i:i + TTR_WINDOW])) / TTR_WINDOW
+        for i in range(len(tokens) - TTR_WINDOW + 1)
+    ]
+    return statistics.mean(ratios)
 
 
 def punctuation_density(text: str) -> float:
@@ -94,8 +113,13 @@ def punctuation_density(text: str) -> float:
         more interesting than full stops, because they vary more between
         writers.
     """
-    # TODO: replace this
-    return 0.0
+    tokens = words(text)
+    if not tokens:
+        return 0.0
+    # Only the marks that vary between writers. Full stops just track sentence
+    # count, which sentence_length_spread already sees.
+    marks = re.findall(r"[,;:()\"!?\u2014\u2013]|--", text)
+    return len(marks) / len(tokens)
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -122,8 +146,42 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
-    # TODO: replace this
-    return 0.5
+    spread_ai = _flip(sentence_length_spread(text), SPREAD_MIDPOINT, SPREAD_SCALE)
+    # Under three sentences the spread is mostly noise, so it says nothing.
+    if len(sentences(text)) < 3:
+        spread_ai = 0.5
+    ttr_ai = _flip(type_token_ratio(text), TTR_MIDPOINT, TTR_SCALE)
+    punct_ai = 1.0 - _flip(punctuation_density(text), PUNCT_MIDPOINT, PUNCT_SCALE)
+
+    score = (
+        WEIGHT_SPREAD * spread_ai
+        + WEIGHT_TTR * ttr_ai
+        + WEIGHT_PUNCT * punct_ai
+    )
+    return round(min(max(score, 0.0), 1.0), 4)
+
+
+# Each measure goes through a logistic so it lands on 0–1 before weighting.
+# Midpoints are the raw value that reads as a coin flip, set from the
+# Milestone 4 calibration inputs (see README, Signals and Scoring).
+#
+#   spread  low  -> AI   human samples 0.38–0.74, AI sample 0.24
+#   ttr     low  -> AI   barely separates anything (0.77–0.90 for all), so
+#                        it gets the smallest weight
+#   punct   high -> AI   the AI sample leaned on commas and dashes (0.08–0.11)
+#                        where casual human posts sat at 0.03–0.045
+SPREAD_MIDPOINT, SPREAD_SCALE = 0.40, 0.08
+TTR_MIDPOINT, TTR_SCALE = 0.82, 0.04
+PUNCT_MIDPOINT, PUNCT_SCALE = 0.06, 0.015
+
+WEIGHT_SPREAD = 0.60
+WEIGHT_PUNCT = 0.25
+WEIGHT_TTR = 0.15
+
+
+def _flip(value: float, midpoint: float, scale: float) -> float:
+    """Logistic that is high BELOW the midpoint: 'less of this' reads as AI."""
+    return 1.0 / (1.0 + math.exp((value - midpoint) / scale))
 
 
 if __name__ == "__main__":
@@ -139,4 +197,3 @@ if __name__ == "__main__":
     print(f"type_token_ratio         {type_token_ratio(text)}")
     print(f"punctuation_density      {punctuation_density(text)}")
     print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")

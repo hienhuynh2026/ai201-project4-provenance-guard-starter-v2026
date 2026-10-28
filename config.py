@@ -57,6 +57,10 @@ DETECTOR_MAX_TOKENS = 400
 WEIGHT_MODEL_SIGNAL = 0.5
 WEIGHT_STYLE_SIGNAL = 0.5
 
+# An accusation needs both signals behind it. If either one reads below this,
+# the combined score can't reach the AI band — see scoring.combine_signals.
+AI_AGREEMENT_FLOOR = 0.5
+
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────
 # Where one label becomes another. Scores run 0.0 (confidently human) to 1.0

@@ -199,17 +199,78 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    import detector
+    import scoring
+    import stylometry
 
-    # TODO: delete this and build the route.
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _reject("unknown", "body_not_json_object",
+                       "Send JSON like {\"text\": \"...\", \"creator_id\": \"...\"}.")
+
+    creator_id = payload.get("creator_id")
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return _reject("unknown", "missing_creator_id",
+                       "creator_id is required and must be a non-empty string.")
+    creator_id = creator_id.strip()
+
+    text = payload.get("text")
+    if not isinstance(text, str) or not text.strip():
+        return _reject(creator_id, "missing_text",
+                       "text is required and must be a non-empty string.")
+    text = text.strip()
+    if len(text) > MAX_TEXT_CHARS:
+        return _reject(creator_id, "text_too_long",
+                       f"text is limited to {MAX_TEXT_CHARS} characters; "
+                       f"this was {len(text)}.", status=413)
+
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError:
+        # Too few tokens for the model to be surprised by anything.
+        return _reject(creator_id, "text_too_short",
+                       "That's too short to judge. Send a few sentences at least.")
+    except detector.DetectorUnavailable as exc:
+        return jsonify({"error": "detector_unavailable", "message": str(exc)}), 503
+
+    style_score = stylometry.style_signal(text)
+    combined_score = scoring.combine_signals(model_score, style_score)
+    # Placeholder until Milestone 5 writes the labels.
+    guess, label = "pending", "PLACEHOLDER — labels arrive in Milestone 5."
+
+    content_id = str(uuid.uuid4())
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
+        status="decided",
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "creator_id": creator_id,
+        "guess": guess,
+        "confidence": combined_score,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+        "status": "decided",
+    })
+
+
+# Roughly 3,000 words. The detector only reads the first 400 tokens anyway, so
+# anything past this is cost with no extra signal.
+MAX_TEXT_CHARS = 20_000
+
+
+def _reject(creator_id: str, reason: str, message: str, status: int = 400):
+    """Refuse a request, and leave a trace of it in the audit log."""
+    audit.log_rejection(creator_id=creator_id, reason=reason)
+    return jsonify({"error": reason, "message": message}), status
 
 
 @app.post("/appeal")

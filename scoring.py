@@ -52,11 +52,21 @@ def combine_signals(model_score: float, style_score: float) -> float:
     The weights in config.py are placeholders. Change them, or ignore them and
     write a different rule.
     """
-    # TODO: replace this
-    return (
+    # The rule: an equal-weight average, except that an accusation needs both
+    # signals behind it. If either signal reads below AI_AGREEMENT_FLOOR, the
+    # score is held just under the AI band, so a split lands on "unsure".
+    #
+    # The case it exists for: plain, simple writing that the model signal reads
+    # as 0.84 (common words are predictable) while the style signal reads 0.39
+    # (the sentences still vary). The average alone is 0.62 — one nudge from an
+    # accusation against a person who may have written every word.
+    score = (
         config.WEIGHT_MODEL_SIGNAL * model_score
         + config.WEIGHT_STYLE_SIGNAL * style_score
     )
+    if min(model_score, style_score) < config.AI_AGREEMENT_FLOOR:
+        score = min(score, config.AI_THRESHOLD - 0.01)
+    return round(min(max(score, 0.0), 1.0), 4)
 
 
 def score_to_label(score: float) -> tuple[str, str]:
