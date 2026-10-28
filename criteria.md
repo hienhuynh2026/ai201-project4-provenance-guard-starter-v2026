@@ -1,4 +1,4 @@
-# Acceptance criteria — Provenance Guard
+# Acceptance criteria for Provenance Guard
 
 Five criteria that say what "working" means for this service, written in unit 7
 **before** you built it.
@@ -6,7 +6,7 @@ Five criteria that say what "working" means for this service, written in unit 7
 **All five are yours.** None are given.
 
 An acceptance criterion names a number or something plainly observable. *"The
-detector is accurate"* is an opinion — and perfect AI detection isn't possible
+detector is accurate"* is an opinion, and perfect AI detection isn't possible
 anyway, so it's an opinion about something nobody can deliver. *"Of 10 pieces I
 wrote myself, at most 1 is labelled high-confidence AI"* is a criterion.
 
@@ -42,63 +42,68 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. My own writing almost never gets called AI
 
-<!-- Your criterion. It must name a number. -->
+Of 10 pieces I wrote myself, at most 1 gets the high-confidence AI label, and
+that has to hold in each of the three trials.
 
-
-
-**Why this target:**
-
-
-
----
-
-## 2.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** On a writing site, telling a real person their work looks
+AI-written is the worst mistake this service can make. Missing some AI text
+costs the site a little. Accusing a writer costs them a lot, so I only allow
+one slip in ten, and not "one on average".
 
 ---
 
-## 3.
+## 2. Clearly AI and clearly human text land far apart
 
-<!-- Your criterion. -->
+Across 5 pieces I'm sure are AI and 5 I'm sure are human, the average combined
+score of the AI set is at least 0.30 higher than the average of the human set,
+in all three trials.
 
-
-
-**Why this target:**
-
-
-
----
-
-## 4.
-
-<!-- Your criterion. -->
-
-
-
-**Why this target:**
-
-
+**Why this target:** If the two groups score close together, the thresholds
+don't mean anything and small noise flips the label. 0.30 is the width of my
+unsure band (0.35 to 0.65), so a gap that size means the obvious cases should
+end up on opposite sides of it instead of both sitting in the middle.
 
 ---
 
-## 5.
+## 3. All three labels show up, and borderline text lands in "unsure"
 
-<!-- Your criterion. -->
+Every trial produces each of the three labels at least once. Of 5 pieces I
+judge borderline (AI text I edited by hand, or my own very plain writing), at
+least 3 land in "unsure" in every trial.
 
+**Why this target:** A label nobody can reach is a gap in the ranges, not a
+feature. And the unsure band exists for exactly the in-between cases, so if
+most of them get pushed to "human" or "AI" instead, the band isn't doing its
+job.
 
+---
 
-**Why this target:**
+## 4. Every appeal gets recorded
 
+10 of 10 appeals with a real content_id come back with status `under_review`
+and add exactly one appeal entry to `logs/audit.jsonl`. 5 of 5 appeals with a
+made-up content_id come back as 404 and add nothing to the log.
 
+**Why this target:** The appeal is the only thing a wrongly accused writer can
+do. If even one appeal goes missing, that person has no way to know it was
+lost, so this one has to be 100%. The 404 half matters too, because an appeal
+that "succeeds" on a typo looks fine and goes nowhere.
+
+---
+
+## 5. Bad input never crashes the service
+
+Missing text, empty text, text that's only spaces, a body that isn't a JSON
+object, and text over 20,000 characters each get a 4xx response with an error
+message. 0 of them return a 500, and each one leaves a rejection entry in the
+log.
+
+**Why this target:** These are the first things anyone poking at the service
+will try, and a crash on any of them is a real outage. Logging the rejections
+means I can see if someone is hammering the service with junk instead of it
+just disappearing.
 
 ---
 

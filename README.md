@@ -64,6 +64,21 @@ reason to `POST /appeal`. That adds an `appeal` entry right after the original
 decision and changes the status to `under_review`. The original entry doesn't
 get touched.
 
+**Following a false positive**
+
+Say a real person writes a short, plain post, the kind where every word is
+common and nothing is fancy. The model signal finds it very predictable and
+gives it something like 0.84. If the style signal agreed, the combined score
+would land in the AI band (0.65 or higher) and they'd read: "This reads a lot
+like text written by AI. We can be wrong about this, especially with plain or
+simple writing. If you wrote it yourself, you can ask for a person to review
+it." Their post isn't removed. They can send the `content_id` and a sentence
+about why we're wrong to `POST /appeal`, and the decision goes to
+`under_review` for a person to look at. This is the case I set my rule and
+thresholds around. In my actual test, the plain paragraph's style score was
+0.39, so the combining rule kept it out of the AI band and it got "unsure"
+instead (see the Sample Run).
+
 **The two endpoints**
 
 | | Goes in | Comes out |
@@ -81,7 +96,7 @@ get touched.
      The blind spot is not optional. If you can't name it you don't understand
      the signal yet — and unit 8's attack set is built out of blind spots. -->
 
-### Signal one — the model signal
+### Signal one: the model signal
 
 **What it measures:** How predictable the text is to gpt2 (its perplexity).
 Low perplexity gets a high score. A perplexity of 45 maps to 0.5, which is the
@@ -99,7 +114,7 @@ almost as high as the clearly AI one (0.92). It works the other way too. Rare
 or fancy words look human to it, so swapping a few unusual words into AI text
 drops the score a lot.
 
-### Signal two — the style signal
+### Signal two: the style signal
 
 **What it measures:** The shape of the text. It doesn't read the words at all.
 I used three measures, turned each one into a 0 to 1 score with a logistic
@@ -202,6 +217,13 @@ clearly AI sample 0.844 (AI).
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
 
+I tried to picture getting this label on something I actually wrote. The first
+thing I'd want to know is "are you saying I cheated?", so the label answers
+that directly: it's not an accusation. It also says a lot of real people's
+writing ends up here, because that's true (my plain-style test paragraph
+did), and it tells the reader nothing happens to their post. I left out the
+score and the word "confidence" on purpose, since a number like 0.62 sounds
+more certain and more serious than this label actually is.
 
 
 ---
@@ -300,17 +322,35 @@ uses port 5000.
 
 ## How I Used AI
 
+I used Claude (Claude Code) a lot on this project, so I want to be upfront
+about it: it wrote most of the code in `stylometry.py`, `scoring.py` and the
+`/submit` and `/appeal` routes, drafted this README, and drafted
+`criteria.md` when I asked it to fill in what was left.
+
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Help with the setup steps. Downloading the model and
+  running `app.py` then curling `/ping` and `/submit` wasn't working for me.
+- *What came back:* It found three separate problems. I was in the wrong
+  virtual environment (my project 3 one), NumPy 2 didn't work with the
+  installed version of torch so it needed `numpy<2`, and port 5000 on my Mac
+  was taken by AirPlay, which is why I was getting 403s.
+- *What I changed:* I asked it to run the service on a different port, so
+  everything here runs on 5001 (`PORT=5001 python app.py`), and the sample
+  run uses that port.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* To work through Milestones 1 to 6.
+- *What came back:* A working style signal, a combining rule, the labels, the
+  appeal route and most of this README. The first version of the commits had
+  a "Co-Authored-By: Claude" line, the writing used a lot of em dashes and
+  sounded more polished than how I write, and the first sample appeal it made
+  used my name with a reason it had made up.
+- *What I changed:* I had it take the co-author line out of the commits and
+  rewrite everything in plainer language without em dashes. The made-up
+  appeal was taken out of the log and redone with a neutral test user
+  (`sample_writer`) so the log only has real test runs in it.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
