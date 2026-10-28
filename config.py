@@ -57,8 +57,9 @@ DETECTOR_MAX_TOKENS = 400
 WEIGHT_MODEL_SIGNAL = 0.5
 WEIGHT_STYLE_SIGNAL = 0.5
 
-# An accusation needs both signals behind it. If either one reads below this,
-# the combined score can't reach the AI band — see scoring.combine_signals.
+# Both signals have to agree before something gets called AI. If either one
+# is below this, the combined score can't reach the AI band (see
+# scoring.combine_signals).
 AI_AGREEMENT_FLOOR = 0.5
 
 

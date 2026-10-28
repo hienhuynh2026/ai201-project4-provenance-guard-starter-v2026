@@ -302,7 +302,7 @@ def appeal():
     reasoning = payload.get("reasoning")
     if not isinstance(content_id, str) or not content_id.strip():
         return jsonify({"error": "missing_content_id",
-                        "message": "content_id is required — it came back "
+                        "message": "content_id is required. You got it back "
                                    "from POST /submit."}), 400
     if not isinstance(reasoning, str) or not reasoning.strip():
         return jsonify({"error": "missing_reasoning",
